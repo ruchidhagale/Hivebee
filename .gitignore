@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+logs/alerts.json
+logs/baseline.json
+logs/debug.log
+logs/report_*.txt
+config/default_config.yaml

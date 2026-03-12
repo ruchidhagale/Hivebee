@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hivebee-ids"
+version = "0.2.0"
+description = "Deception-based intrusion detection for Linux"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "rich>=13.0",
+    "pyyaml>=6.0",
+    "anthropic>=0.25",
+]
+
+[project.scripts]
+hivebee = "hivebee.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hivebee*"]

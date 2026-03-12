@@ -1,0 +1,31 @@
+ai:
+  api_key: ''
+  enabled: true
+  model: claude-sonnet-4-20250514
+alerts:
+  desktop: true
+  email:
+    enabled: false
+    from: ''
+    password: ''
+    smtp_host: smtp.gmail.com
+    smtp_port: 587
+    to: ''
+  notify_on: HIGH
+honeyfiles: []
+logging:
+  alerts_log: logs/alerts.json
+  debug_log: logs/debug.log
+monitor:
+  poll_interval: 5
+scoring:
+  after_hours_points: 2
+  credential_file_points: 4
+  critical_threshold: 7
+  root_access_points: 4
+  unknown_process_points: 3
+whitelisted_processes:
+- auditd
+- auditctl
+- python3
+- hivebee
