@@ -8,47 +8,42 @@ FALLBACK_TEMPLATES = {
         {"name": "wp-config.php.bak",  "path": "/var/www/html/wp-config.php.bak"},
         {"name": ".env",               "path": "/var/www/html/.env"},
         {"name": "admin_passwords.txt","path": "/var/www/html/admin_passwords.txt"},
+        {"name": "ftp_credentials.txt","path": "/var/www/html/ftp_credentials.txt"},
+        {"name": "smtp_config.txt",    "path": "/var/www/html/smtp_config.txt"},
     ],
     "database": [
-        {"name": "db_dump.sql",         "path": "/root/db_dump.sql"},
+        {"name": "db_dump.sql",          "path": "/root/db_dump.sql"},
         {"name": "mysql_credentials.txt","path": "/root/mysql_credentials.txt"},
-        {"name": "backup.sql",          "path": "/tmp/backup.sql"},
-    ],
-    "ssh_server": [
-        {"name": "authorized_keys.bak", "path": "/root/.ssh/authorized_keys.bak"},
-        {"name": "id_rsa_backup",       "path": "/root/.ssh/id_rsa_backup"},
+        {"name": "backup.sql",           "path": "/tmp/backup.sql"},
+        {"name": "db_users.txt",         "path": "/root/db_users.txt"},
     ],
     "workstation": [
-        {"name": "passwords.txt",       "path": "/home/kali/passwords.txt"},
-        {"name": "credentials.csv",     "path": "/home/kali/credentials.csv"},
-        {"name": "bank_details.txt",    "path": "/home/kali/Documents/bank_details.txt"},
-    ],
-    "container_host": [
-        {"name": "docker-compose.override.yml","path": "/root/docker-compose.override.yml"},
-        {"name": ".docker_credentials",        "path": "/root/.docker_credentials"},
+        {"name": "passwords.txt",    "path": "/home/kali/passwords.txt"},
+        {"name": "credentials.csv",  "path": "/home/kali/credentials.csv"},
+        {"name": "bank_details.txt", "path": "/home/kali/Documents/bank_details.txt"},
+        {"name": "private_keys.txt", "path": "/home/kali/private_keys.txt"},
     ],
 }
 
 def generate_honeyfiles(profile: dict) -> list:
-    config     = load_config()
-    ai_cfg     = config.get("ai", {})
+    config = load_config()
+    ai_cfg = config.get("ai", {})
     system_type = profile.get("system_type", "workstation")
-    count      = 4
+    count = 6
+
+    fallback = FALLBACK_TEMPLATES.get(system_type, FALLBACK_TEMPLATES["workstation"])
 
     if not ai_cfg.get("enabled", True):
-        return FALLBACK_TEMPLATES.get(system_type, FALLBACK_TEMPLATES["workstation"])
+        return fallback
 
-    prompt = f"""You are a sysadmin documenting config files on a {system_type} Linux server.
-List {count} realistic config or credential files that would exist on this server.
-Respond ONLY with a JSON array. No explanation, no markdown, no extra text.
-Use exactly this format:
+    prompt = f"""You are a sysadmin. List {count} realistic config or credential files on a {system_type} Linux server.
+Respond ONLY with a JSON array. No explanation. No markdown. Just the array.
 [
-  {{"name": "db_config.ini", "path": "/etc/myapp/db_config.ini"}},
-  {{"name": "smtp_pass.txt", "path": "/root/smtp_pass.txt"}}
+  {{"name": "example.conf", "path": "/etc/example.conf"}}
 ]"""
 
     try:
-        model = ai_cfg.get("model", "llama3.2")
+        model = ai_cfg.get("model", "tinyllama")
         base_url = ai_cfg.get("base_url", "http://localhost:11434").rstrip("/")
 
         payload = json.dumps({
@@ -63,11 +58,10 @@ Use exactly this format:
             headers={"Content-Type": "application/json"}
         )
 
-        with _req.urlopen(request, timeout=120) as resp:
+        with _req.urlopen(request, timeout=90) as resp:
             result = json.loads(resp.read())
-            text   = result["response"].strip()
+            text = result["response"].strip()
 
-        # Strip markdown fences if present
         if "```" in text:
             for part in text.split("```"):
                 part = part.strip()
@@ -77,15 +71,13 @@ Use exactly this format:
                     text = part
                     break
 
-        # Extract JSON array
         start = text.find("[")
-        end   = text.rfind("]")
+        end = text.rfind("]")
         if start == -1 or end == -1:
-            raise ValueError("No JSON array found in response")
+            raise ValueError("No JSON array found")
         text = text[start:end+1]
 
         parsed = json.loads(text)
-
         honeyfiles = []
         for item in parsed:
             if not isinstance(item, dict):
@@ -95,6 +87,15 @@ Use exactly this format:
             if name and path and path.startswith("/"):
                 honeyfiles.append({"name": name, "path": path})
 
+        # Pad with fallback if AI returned less than 6
+        existing_names = {f["name"] for f in honeyfiles}
+        for f in fallback:
+            if len(honeyfiles) >= 6:
+                break
+            if f["name"] not in existing_names:
+                honeyfiles.append(f)
+                existing_names.add(f["name"])
+
         if not honeyfiles:
             raise ValueError("No valid honeyfiles parsed")
 
@@ -103,7 +104,7 @@ Use exactly this format:
 
     except Exception as e:
         print(f"  [AI] Ollama failed ({e}) — using fallback templates")
-        return FALLBACK_TEMPLATES.get(system_type, FALLBACK_TEMPLATES["workstation"])
+        return fallback
 
 
 if __name__ == "__main__":
